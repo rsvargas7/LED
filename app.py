@@ -1,29 +1,40 @@
 import streamlit as st
-import serial
-import time
+import paho.mqtt.client as mqtt
 
-# Cambia el puerto COM por el que te muestre tu sistema (ej. COM3, /dev/ttyUSB0, etc.)
-ARDUINO_PORT = 'COM3'  # Ajusta esto a tu puerto
-BAUD_RATE = 9600
+# Configuración del Broker MQTT
+BROKER = "broker.hivemq.com"
+PORT = 1883
+TOPIC = "led/control"
 
-@st.cache_resource
-def get_serial_connection():
-    try:
-        return serial.Serial(ARDUINO_PORT, BAUD_RATE, timeout=1)
-    except:
-        st.error("No se pudo conectar al Arduino.")
-        return None
+# Conectar al broker MQTT
+client = mqtt.Client()
+client.connect(BROKER, PORT, 60)
 
-arduino = get_serial_connection()
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        st.success("Conectado al broker MQTT")
+    else:
+        st.error("Error al conectar al broker MQTT")
 
-st.title("Control de LED con Streamlit y Arduino")
+# Asignar la función de conexión
+client.on_connect = on_connect
 
-if st.button("Encender LED"):
-    if arduino:
-        arduino.write(b'1')
-        st.success("LED Encendido")
+# Conectar al broker
+client.loop_start()
 
-if st.button("Apagar LED"):
-    if arduino:
-        arduino.write(b'0')
-        st.success("LED Apagado")
+# Interfaz de Streamlit
+st.title("Control de LED con MQTT")
+
+# Switch (checkbox) para controlar el LED
+led_on = st.checkbox("Encender LED", value=False)
+
+# Enviar comando al Arduino (Wokwi o físico) dependiendo del estado del switch
+if led_on:
+    client.publish(TOPIC, "on")
+    st.success("LED Encendido")
+else:
+    client.publish(TOPIC, "off")
+    st.success("LED Apagado")
+
+# Mantener la conexión MQTT activa
+client.loop_forever()
